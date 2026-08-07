@@ -78,3 +78,24 @@ def municipios_nao_encontrados(df):
         return pd.DataFrame()
 
     return df[df["latitude"].isna() | df["longitude"].isna()].copy()
+
+
+if __name__ == "__main__":
+    df_teste = pd.DataFrame([
+        {"municipio_codigo": "2300101", "nome": "Abaiara", "latitude": -7.34, "longitude": -39.04},
+        {"municipio_codigo": "2300150", "nome": "Acarape", "latitude": None, "longitude": None},
+        {"municipio_codigo": "2999999", "nome": "Nome Errado", "latitude": -7.34, "longitude": -39.04},
+        {"municipio_codigo": "2300200", "nome": "Fora do Ceara", "latitude": -8.50, "longitude": -45.20},
+    ])
+
+    print("--- Card 1: validar_geocoding ---")
+    validos, inconsistencias = validar_geocoding(df_teste)
+    print(f"válidos: {len(validos)} linhas")
+    print(validos)
+    print(f"\ninconsistências: {len(inconsistencias)} linhas")
+    print(inconsistencias)
+
+    print("\n--- Card 2 (passo 1): municipios_nao_encontrados ---")
+    faltantes = municipios_nao_encontrados(df_teste)
+    print(f"sem coordenada: {len(faltantes)} linhas")
+    print(faltantes)

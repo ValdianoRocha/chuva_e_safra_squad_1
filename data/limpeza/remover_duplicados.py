@@ -22,3 +22,22 @@ def remover_duplicados(df, colunas_chave=None):
     }
 
     return df, relatorio
+
+
+if __name__ == "__main__":
+    import pandas as pd
+
+    df_teste = pd.DataFrame([
+        {"municipio_codigo": "2300101", "ano": 2020, "produto": "milho", "valor_producao_mil_reais": 900},
+        {"municipio_codigo": "2300101", "ano": 2020, "produto": "milho", "valor_producao_mil_reais": 900},
+        {"municipio_codigo": "2300150", "ano": 2020, "produto": "feijao", "valor_producao_mil_reais": 300},
+    ])
+
+    print("--- Antes de remover duplicatas ---")
+    print(df_teste)
+
+    df_sem_dup, relatorio = remover_duplicados(df_teste, colunas_chave=["municipio_codigo", "ano", "produto"])
+
+    print("\n--- Card 6: remover_duplicados ---")
+    print(df_sem_dup)
+    print(f"\nrelatório: {relatorio}")

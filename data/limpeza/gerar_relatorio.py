@@ -1,5 +1,3 @@
-import re
-
 import pandas as pd
 
 
@@ -42,3 +40,21 @@ def gerar_relatorio(df):
         relatorio["chuva_data_invalida"] = int(datas_invalidas.sum())
 
     return relatorio
+
+
+if __name__ == "__main__":
+    df_producao_teste = pd.DataFrame([
+        {"municipio_codigo": "2300101", "ano": 2020},
+        {"municipio_codigo": "2999999", "ano": 1800},  # código e ano inválidos de propósito
+    ])
+
+    df_clima_teste = pd.DataFrame([
+        {"municipio_codigo": "2300101", "data": "2022-01-01"},
+        {"municipio_codigo": "2300101", "data": "data-invalida"},
+    ])
+
+    print("--- Card 8: gerar_relatorio (produção) ---")
+    print(gerar_relatorio(df_producao_teste))
+
+    print("\n--- Card 8: gerar_relatorio (clima) ---")
+    print(gerar_relatorio(df_clima_teste))
