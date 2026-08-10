@@ -1,128 +1,407 @@
 """
 dependencias.py
 
-Não redefine nenhuma função - só importa (reexporta) as funções de cada
-arquivo de limpeza, executa a sequência completa (1 a 9) e deixa os
-resultados finais disponíveis para qualquer outro arquivo do projeto
-importar, sem precisar conhecer os 9 módulos individuais.
+Orquestrador do pipeline completo de limpeza do projeto Chuva & Safra.
 
-Uso, de dentro de outro arquivo (ex: a etapa de Cruzamento/Merge):
+O arquivo não implementa regras de limpeza.
+Ele apenas chama as funções existentes em cada módulo.
 
-    from limpeza.dependencias import df_geocoding, df_producao, df_clima, relatorios
+Fluxo:
 
-Ou rodando direto no terminal, de dentro de data/:
-
-    python -m limpeza.dependencias
+ENTRADA
+    ↓
+carregar_dados.py
+    ↓
+Card 1 - Validar geocoding
+    ↓
+Card 2 - Tratar municípios não encontrados
+    ↓
+Card 3 - Validar estrutura SIDRA
+    ↓
+Card 4 - Padronizar tipos
+    ↓
+Card 5 - Tratar valores nulos
+    ↓
+Card 6 - Remover duplicados
+    ↓
+Card 7 - Padronizar municípios
+    ↓
+Card 8 - Gerar relatório
+    ↓
+DADOS LIMPOS
+    ↓
+Cruzamento / Merge
 """
 
 import pandas as pd
 
-# ---- reexporta as funções de cada arquivo (não redefine nada aqui) ----
-from carregar_dados import (
+# ============================================================
+# ENTRADA - CARREGAMENTO DOS DADOS
+# ============================================================
+
+from .carregar_dados import (
     carregar_municipio_coordenada,
     carregar_producao_agricola,
     carregar_clima_diario,
 )
-from validar_geocoding import validar_geocoding, municipios_nao_encontrados
-from tratar_nao_encontrados import tratar_nao_encontrados, gerar_nomes_alternativos
-from validar_estrutura_sidra import validar_estrutura_sidra
-from padronizar_tipos import padronizar_tipos
-from tratar_nulos import tratar_nulos
-from remover_duplicados import remover_duplicados
-from padronizar_municipios import padronizar_municipios, remover_acentos
-from gerar_relatorio import gerar_relatorio
 
-# ---- 1. carregar_dados.py ----
-print("[1/9] Carregando dados do banco...")
-df_geo_bruto = carregar_municipio_coordenada()
-df_producao = carregar_producao_agricola()
-df_clima = carregar_clima_diario()
+# ============================================================
+# CARD 1 - VALIDAR GEOCODING
+# ============================================================
 
-# ---- 2. validar_geocoding.py (Card 1) ----
-print("[2/9] Validando geocoding (Card 1)...")
-df_geocoding, geocoding_inconsistencias = validar_geocoding(df_geo_bruto)
-geocoding_faltantes = municipios_nao_encontrados(df_geo_bruto)
+from .validar_geocoding import (
+    validar_geocoding,
+    municipios_nao_encontrados,
+)
 
-# ---- 3. tratar_nao_encontrados.py (Card 2) ----
-print("[3/9] Tratando municípios não encontrados (Card 2)...")
-try:
-    from external_apis.openmeteo_api import buscar_coordenadas
+# ============================================================
+# CARD 2 - TRATAR MUNICÍPIOS NÃO ENCONTRADOS
+# ============================================================
 
-    def _funcao_geocoding(nome):
-        return buscar_coordenadas(nome)
+from .tratar_nao_encontrados import (
+    tratar_nao_encontrados,
+)
 
-    municipios_resolvidos, relatorio_nao_encontrados = tratar_nao_encontrados(
-        geocoding_faltantes, _funcao_geocoding
+# ============================================================
+# CARD 3 - VALIDAR ESTRUTURA SIDRA
+# ============================================================
+
+from .validar_estrutura_sidra import (
+    validar_estrutura_sidra,
+)
+
+# ============================================================
+# CARD 4 - PADRONIZAR TIPOS
+# ============================================================
+
+from .padronizar_tipos import (
+    padronizar_tipos,
+)
+
+# ============================================================
+# CARD 5 - TRATAR NULOS
+# ============================================================
+
+from .tratar_nulos import (
+    tratar_nulos,
+)
+
+# ============================================================
+# CARD 6 - REMOVER DUPLICADOS
+# ============================================================
+
+from .remover_duplicados import (
+    remover_duplicados,
+)
+
+# ============================================================
+# CARD 7 - PADRONIZAR MUNICÍPIOS
+# ============================================================
+
+from .padronizar_municipios import (
+    padronizar_municipios,
+)
+
+# ============================================================
+# CARD 8 - GERAR RELATÓRIO
+# ============================================================
+
+from .gerar_relatorio import (
+    gerar_relatorio,
+)
+
+
+# ============================================================
+# PIPELINE COMPLETO
+# ============================================================
+
+def executar_limpeza():
+    """
+    Executa todo o pipeline de limpeza.
+
+    Retorna:
+
+        {
+            "df_geocoding": DataFrame,
+            "df_producao": DataFrame,
+            "df_clima": DataFrame,
+            "relatorios": dict
+        }
+    """
+
+    # --------------------------------------------------------
+    # CARREGAMENTO
+    # --------------------------------------------------------
+
+    df_geo_bruto = carregar_municipio_coordenada()
+    df_producao = carregar_producao_agricola()
+    df_clima = carregar_clima_diario()
+
+    # --------------------------------------------------------
+    # CARD 1 - VALIDAR GEOCODING
+    # --------------------------------------------------------
+
+    (
+        df_geocoding,
+        geocoding_inconsistencias,
+    ) = validar_geocoding(df_geo_bruto)
+
+    geocoding_faltantes = municipios_nao_encontrados(
+        df_geo_bruto
     )
-    if not municipios_resolvidos.empty:
-        df_geocoding = pd.concat([df_geocoding, municipios_resolvidos], ignore_index=True)
-except ImportError:
-    print("  aviso: não foi possível importar buscar_coordenadas, etapa pulada")
+
+    # --------------------------------------------------------
+    # CARD 2 - TRATAR MUNICÍPIOS NÃO ENCONTRADOS
+    # --------------------------------------------------------
+
     municipios_resolvidos = pd.DataFrame()
-    relatorio_nao_encontrados = geocoding_faltantes
+    relatorio_nao_encontrados = pd.DataFrame()
 
-# ---- 4. validar_estrutura_sidra.py (Card 3) ----
-print("[4/9] Validando estrutura do SIDRA (Card 3)...")
-erros_estrutura_sidra = validar_estrutura_sidra(df_producao)
-if erros_estrutura_sidra:
-    for erro in erros_estrutura_sidra:
-        print(f"  aviso: {erro}")
+    try:
+        from external_apis.openmeteo_api import buscar_coordenadas
 
-# ---- 5. padronizar_tipos.py (Card 4) ----
-print("[5/9] Padronizando tipos (Card 4)...")
-df_producao = padronizar_tipos(df_producao)
-df_clima = padronizar_tipos(df_clima)
+        (
+            municipios_resolvidos,
+            relatorio_nao_encontrados,
+        ) = tratar_nao_encontrados(
+            geocoding_faltantes,
+            buscar_coordenadas,
+        )
 
-# ---- 6. tratar_nulos.py (Card 5) ----
-print("[6/9] Tratando valores ausentes (Card 5)...")
-df_producao, log_nulos_producao = tratar_nulos(df_producao)
-df_clima, log_nulos_clima = tratar_nulos(df_clima)
+        if not municipios_resolvidos.empty:
+            df_geocoding = pd.concat(
+                [
+                    df_geocoding,
+                    municipios_resolvidos,
+                ],
+                ignore_index=True,
+            )
 
-# ---- 7. remover_duplicados.py (Card 6) ----
-print("[7/9] Removendo duplicidades (Card 6)...")
-df_producao, duplicatas_producao = remover_duplicados(
-    df_producao, colunas_chave=["municipio_codigo", "ano", "produto"]
-)
-df_clima, duplicatas_clima = remover_duplicados(
-    df_clima, colunas_chave=["municipio_codigo", "data"]
-)
+    except ImportError:
+        relatorio_nao_encontrados = (
+            geocoding_faltantes.copy()
+        )
 
-# ---- 8. padronizar_municipios.py (Card 7) ----
-print("[8/9] Padronizando nomes de municípios (Card 7)...")
-df_geocoding = padronizar_municipios(df_geocoding)
+    # --------------------------------------------------------
+    # REVALIDAÇÃO DO GEOCODING
+    # --------------------------------------------------------
 
-# ---- 9. gerar_relatorio.py (Card 8) ----
-print("[9/9] Gerando relatório final de qualidade (Card 8)...")
-qualidade_producao = gerar_relatorio(df_producao)
-qualidade_clima = gerar_relatorio(df_clima)
-qualidade_geocoding = gerar_relatorio(df_geocoding)
+    if not municipios_resolvidos.empty:
 
-# ---- dicionário com todos os relatórios, pra quem importar não precisar
-#      pegar variável por variável ----
-relatorios = {
-    "geocoding_inconsistencias": geocoding_inconsistencias,
-    "geocoding_faltantes": geocoding_faltantes,
-    "relatorio_nao_encontrados": relatorio_nao_encontrados,
-    "erros_estrutura_sidra": erros_estrutura_sidra,
-    "log_nulos_producao": log_nulos_producao,
-    "log_nulos_clima": log_nulos_clima,
-    "duplicatas_producao": duplicatas_producao,
-    "duplicatas_clima": duplicatas_clima,
-    "qualidade_producao": qualidade_producao,
-    "qualidade_clima": qualidade_clima,
-    "qualidade_geocoding": qualidade_geocoding,
-}
+        (
+            df_geocoding_validado,
+            novas_inconsistencias,
+        ) = validar_geocoding(df_geocoding)
 
-print("\nLimpeza concluída.")
-print(f"  geocoding: {len(df_geocoding)} municípios válidos")
-print(f"  produção:  {len(df_producao)} linhas")
-print(f"  clima:     {len(df_clima)} linhas")
+        df_geocoding = df_geocoding_validado
 
+        if not novas_inconsistencias.empty:
+            geocoding_inconsistencias = pd.concat(
+                [
+                    geocoding_inconsistencias,
+                    novas_inconsistencias,
+                ],
+                ignore_index=True,
+            )
+
+    # --------------------------------------------------------
+    # CARD 3 - VALIDAR ESTRUTURA SIDRA
+    # --------------------------------------------------------
+
+    erros_estrutura_sidra = validar_estrutura_sidra(
+        df_producao
+    )
+
+    # --------------------------------------------------------
+    # CARD 4 - PADRONIZAR TIPOS
+    # --------------------------------------------------------
+
+    df_geocoding = padronizar_tipos(df_geocoding)
+    df_producao = padronizar_tipos(df_producao)
+    df_clima = padronizar_tipos(df_clima)
+
+    # --------------------------------------------------------
+    # CARD 5 - TRATAR NULOS
+    # --------------------------------------------------------
+
+    (
+        df_producao,
+        log_nulos_producao,
+    ) = tratar_nulos(df_producao)
+
+    (
+        df_clima,
+        log_nulos_clima,
+    ) = tratar_nulos(df_clima)
+
+    (
+        df_geocoding,
+        log_nulos_geocoding,
+    ) = tratar_nulos(df_geocoding)
+
+    # --------------------------------------------------------
+    # CARD 6 - REMOVER DUPLICADOS
+    # --------------------------------------------------------
+
+    (
+        df_producao,
+        duplicatas_producao,
+    ) = remover_duplicados(
+        df_producao,
+        colunas_chave=[
+            "municipio_codigo",
+            "ano",
+            "produto",
+        ],
+    )
+
+    (
+        df_clima,
+        duplicatas_clima,
+    ) = remover_duplicados(
+        df_clima,
+        colunas_chave=[
+            "municipio_codigo",
+            "data",
+        ],
+    )
+
+    (
+        df_geocoding,
+        duplicatas_geocoding,
+    ) = remover_duplicados(
+        df_geocoding,
+        colunas_chave=[
+            "municipio_codigo",
+        ],
+    )
+
+    # --------------------------------------------------------
+    # CARD 7 - PADRONIZAR MUNICÍPIOS
+    # --------------------------------------------------------
+
+    df_geocoding = padronizar_municipios(
+        df_geocoding
+    )
+
+    # --------------------------------------------------------
+    # CARD 8 - GERAR RELATÓRIOS
+    # --------------------------------------------------------
+
+    qualidade_geocoding = gerar_relatorio(
+        df_geocoding
+    )
+
+    qualidade_producao = gerar_relatorio(
+        df_producao
+    )
+
+    qualidade_clima = gerar_relatorio(
+        df_clima
+    )
+
+    # --------------------------------------------------------
+    # RELATÓRIOS
+    # --------------------------------------------------------
+
+    relatorios = {
+        "geocoding_inconsistencias":
+            geocoding_inconsistencias,
+
+        "geocoding_faltantes":
+            geocoding_faltantes,
+
+        "municipios_resolvidos":
+            municipios_resolvidos,
+
+        "relatorio_nao_encontrados":
+            relatorio_nao_encontrados,
+
+        "erros_estrutura_sidra":
+            erros_estrutura_sidra,
+
+        "log_nulos_producao":
+            log_nulos_producao,
+
+        "log_nulos_clima":
+            log_nulos_clima,
+
+        "log_nulos_geocoding":
+            log_nulos_geocoding,
+
+        "duplicatas_producao":
+            duplicatas_producao,
+
+        "duplicatas_clima":
+            duplicatas_clima,
+
+        "duplicatas_geocoding":
+            duplicatas_geocoding,
+
+        "qualidade_geocoding":
+            qualidade_geocoding,
+
+        "qualidade_producao":
+            qualidade_producao,
+
+        "qualidade_clima":
+            qualidade_clima,
+    }
+
+    # --------------------------------------------------------
+    # RESULTADO
+    # --------------------------------------------------------
+
+    return {
+        "df_geocoding": df_geocoding,
+        "df_producao": df_producao,
+        "df_clima": df_clima,
+        "relatorios": relatorios,
+    }
+
+
+# ============================================================
+# EXECUÇÃO DIRETA
+# ============================================================
 
 if __name__ == "__main__":
-    print("\n--- Relatório de qualidade: produção ---")
-    print(qualidade_producao)
-    print("\n--- Relatório de qualidade: clima ---")
-    print(qualidade_clima)
-    print("\n--- Relatório de qualidade: geocoding ---")
-    print(qualidade_geocoding)
+
+    resultado = executar_limpeza()
+
+    print("\n=== LIMPEZA CONCLUÍDA ===")
+
+    print(
+        f"Produção: {len(resultado['df_producao'])} registros"
+    )
+
+    print(
+        f"Clima: {len(resultado['df_clima'])} registros"
+    )
+
+    print(
+        f"Geocoding: {len(resultado['df_geocoding'])} municípios"
+    )
+
+    erros = resultado["relatorios"]["erros_estrutura_sidra"]
+
+    if erros:
+        print("\n⚠️ AVISOS SIDRA:")
+        for erro in erros:
+            print(f"- {erro}")
+
+    print("\n=== QUALIDADE ===")
+
+    print(
+        "Produção:",
+        resultado["relatorios"]["qualidade_producao"]
+    )
+
+    print(
+        "Clima:",
+        resultado["relatorios"]["qualidade_clima"]
+    )
+
+    print(
+        "Geocoding:",
+        resultado["relatorios"]["qualidade_geocoding"]
+    )
