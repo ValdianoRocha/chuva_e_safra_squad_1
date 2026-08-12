@@ -44,17 +44,37 @@ def obter_grafico(
             detail="Informe pelo menos um município."
         )
 
-    # --- Consulta e filtro dos dados ---
+    # --- Consulta os dados do banco ---
     df = get_db()
 
+    # --- Valida se os municípios informados existem ---
+    municipios_int = None
+    if municipios:
+        try:
+            municipios_int = [int(m) for m in municipios]
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Código de município inválido. Use apenas números (código IBGE)."
+            )
+
+        municipios_existentes = set(df["municipio_codigo"].unique())
+        municipios_invalidos = [m for m in municipios_int if m not in municipios_existentes]
+
+        if municipios_invalidos:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Município(s) não encontrado(s): {municipios_invalidos}"
+            )
+
+    # --- Filtra os dados ---
     df_filtrado = df[
         (df["produto"] == cultura) &
         (df["ano"] >= de) &
         (df["ano"] <= ate)
     ]
 
-    if municipios:
-        municipios_int = [int(m) for m in municipios]
+    if municipios_int:
         df_filtrado = df_filtrado[df_filtrado["municipio_codigo"].isin(municipios_int)]
 
     if df_filtrado.empty:
