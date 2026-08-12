@@ -72,3 +72,22 @@ def tratar_nulos(df):
                 })
 
     return df.reset_index(drop=True), pd.DataFrame(log)
+
+
+if __name__ == "__main__":
+    df_teste = pd.DataFrame([
+        {"municipio_codigo": "2300101", "area_plantada_ha": "-", "precipitacao_mm": None},
+        {"municipio_codigo": None, "area_plantada_ha": "150", "precipitacao_mm": 5.0},
+        {"municipio_codigo": "2300150", "area_plantada_ha": "80", "precipitacao_mm": "..."},
+    ])
+
+    print("--- Antes do tratamento ---")
+    print(df_teste)
+
+    df_tratado, log = tratar_nulos(df_teste)
+
+    print("\n--- Card 5: tratar_nulos ---")
+    print(f"linhas finais: {len(df_tratado)}")
+    print(df_tratado)
+    print("\nlog de alterações:")
+    print(log)

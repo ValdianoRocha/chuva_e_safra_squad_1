@@ -27,9 +27,14 @@ def carregar_municipio_coordenada():
     Serve de entrada para validar_geocoding() e municipios_nao_encontrados()
     (Cards 1 e 2).
     """
-    query = SessionLocal().query(MunicipioCoordenada).statement
-    df = pd.read_sql(query, engine)
-    return df
+    db = SessionLocal()
+    try:
+        query = db.query(MunicipioCoordenada).statement
+        df = pd.read_sql(query, engine)
+        return df
+    finally:
+        # fecha a sessão mesmo se pd.read_sql der erro no meio do caminho
+        db.close()
 
 
 def carregar_producao_agricola():
@@ -41,9 +46,13 @@ def carregar_producao_agricola():
     Serve de entrada para validar_estrutura_sidra(), padronizar_tipos(),
     tratar_nulos() e remover_duplicados() (Cards 3 a 6).
     """
-    query = SessionLocal().query(ProducaoAgricola).statement
-    df = pd.read_sql(query, engine)
-    return df
+    db = SessionLocal()
+    try:
+        query = db.query(ProducaoAgricola).statement
+        df = pd.read_sql(query, engine)
+        return df
+    finally:
+        db.close()
 
 
 def carregar_clima_diario():
@@ -54,9 +63,13 @@ def carregar_clima_diario():
     Serve de entrada para padronizar_tipos(), tratar_nulos() e
     gerar_relatorio() (valida "chuva possui data válida" do Card 8).
     """
-    query = SessionLocal().query(ClimaDiario).statement
-    df = pd.read_sql(query, engine)
-    return df
+    db = SessionLocal()
+    try:
+        query = db.query(ClimaDiario).statement
+        df = pd.read_sql(query, engine)
+        return df
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":

@@ -54,3 +54,21 @@ def padronizar_municipios(df):
         .apply(_capitalizar_com_preposicoes)
     )
     return df
+
+
+if __name__ == "__main__":
+    import pandas as pd
+
+    df_teste = pd.DataFrame([
+        {"nome": "  são   gonçalo do amarante "},
+        {"nome": "ACARAPE"},
+        {"nome": "barro"},
+    ])
+
+    print("--- Antes da padronização ---")
+    print(df_teste)
+
+    df_padronizado = padronizar_municipios(df_teste)
+
+    print("\n--- Card 7: padronizar_municipios ---")
+    print(df_padronizado)

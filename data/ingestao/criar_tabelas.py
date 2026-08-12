@@ -1,5 +1,5 @@
 from database.db import engine, Base
-from models.models import MunicipioCoordenada, ProducaoAgricola, ClimaDiario
+from models.models import MunicipioCoordenada, ProducaoAgricola, ClimaDiario, ChuvaSafraMerge
 
 # Cria todas as tabelas registradas na Base (se ainda não existirem)
 Base.metadata.create_all(bind=engine)

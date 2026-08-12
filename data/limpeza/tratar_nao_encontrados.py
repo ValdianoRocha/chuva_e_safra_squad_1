@@ -111,3 +111,23 @@ def tratar_nao_encontrados(df_faltantes, funcao_geocoding, max_tentativas=3):
             })
 
     return pd.DataFrame(resolvidos), pd.DataFrame(linhas_relatorio)
+
+
+if __name__ == "__main__":
+    df_faltantes_teste = pd.DataFrame([
+        {"municipio_codigo": "2300150", "nome": "Acarape"},
+        {"municipio_codigo": "2300309", "nome": "Municipio Inexistente"},
+    ])
+
+    def geocoding_fake(nome_busca):
+        """Simula uma API: só 'acha' Acarape, o resto falha (pra testar os dois caminhos)."""
+        if "Acarape" in nome_busca:
+            return {"latitude": -4.20, "longitude": -38.71}
+        return None
+
+    print("--- Card 2: tratar_nao_encontrados ---")
+    resolvidos, relatorio = tratar_nao_encontrados(df_faltantes_teste, geocoding_fake)
+    print(f"resolvidos: {len(resolvidos)} linhas")
+    print(resolvidos)
+    print(f"\nrelatório completo: {len(relatorio)} linhas")
+    print(relatorio)

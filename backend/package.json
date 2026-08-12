@@ -4,26 +4,29 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-  "start": "npx prisma migrate deploy && node src/index.js",
-  "dev": "nodemon src/index.js",
-  "db:migrate": "prisma migrate deploy",
-  "db:studio": "prisma studio",
-  "db:reset": "prisma migrate reset --force"
-},
+    "start": "npx prisma migrate deploy && node src/index.js",
+    "dev": "nodemon src/index.js",
+    "db:migrate": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "db:reset": "prisma migrate reset --force"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "axios": "^1.19.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "jsonwebtoken": "^9.0.3"
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.0"
   },
   "devDependencies": {
+    "@types/node": "^26.2.0",
     "nodemon": "^3.1.14",
     "prisma": "^7.9.1"
   }
