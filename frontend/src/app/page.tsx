@@ -1,3 +1,9 @@
-export default function App() {
-  return <div>Chuva e Safra — Em construção</div>;
+import Image from "next/image";
+
+export default function Home() {
+  return (
+    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+      <h1>Hello word</h1>
+    </div>
+  );
 }
