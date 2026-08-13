@@ -254,136 +254,132 @@ def obter_grafico(
             detail="Informe pelo menos um município."
         )
 
-    # --- Buscar dados (módulo get_db) ---
-    df = get_db()
-    
- # --- Converter nome do município para código IBGE ---
-    municipios_int = None
+    try:
+        # --- Buscar dados (módulo get_db) ---
+        df = get_db()
+        
+        # --- Converter nome do município para código IBGE ---
+        municipios_int = None
 
-    if municipios:
-        municipios_int = [
-            MUNICIPIOS[m.value]
-            for m in municipios
+        if municipios:
+            municipios_int = [
+                MUNICIPIOS[m.value]
+                for m in municipios
+            ]
+
+        # --- Integrar módulo de análise: aplicar filtros ---
+        df_filtrado = aplicar_filtros(
+            df,
+            cultura,
+            de,
+            ate,
+            municipios_int
+        )
+
+        if df_filtrado.empty:
+            raise HTTPException(
+                status_code=404,
+                detail="Nenhum dado encontrado para os filtros informados."
+            )
+
+        # --- Integrar módulo de análise: solicitar figura --- #
+        figura = solicitar_figura(
+            df_filtrado,
+            cultura,
+            de,
+            ate
+        )
+
+        # --- Integrar módulo de análise: solicitar KPIs --- #
+        kpis = {}
+
+        # PRODUTOR
+
+        if perfil == "PRODUTOR":
+            return {
+                "figura": figura,
+                "kpis": kpis,
+            }
+
+        # TABELA POR MUNICÍPIO
+
+        tabela_municipios = (
+            df_filtrado
+            .groupby(["municipio_codigo", "nome"], dropna=False)
+            .agg(
+                produtividade_media=("rendimento_medio_kg_ha", "mean"),
+                chuva_total=("precipitacao_total_mm_T1", "sum"),
+            )
+            .reset_index()
+        )
+
+        # TECNICO
+
+        if perfil == "TECNICO":
+            tabela = []
+
+            for _, linha in tabela_municipios.iterrows():
+                tabela.append({
+                    "municipio": linha["nome"],
+                    "codigo": str(int(linha["municipio_codigo"])),
+                    "produtividade_media": f"{linha['produtividade_media']:.0f} kg/ha",
+                    "chuva_total": f"{linha['chuva_total']:.0f} mm",
+                })
+
+            kpis["tabela"] = tabela
+
+            return {
+                "figura": figura,
+                "kpis": kpis
+            }
+
+        # GESTOR
+
+        # Ranking dos municípios por produtividade
+        tabela_municipios = tabela_municipios.sort_values(
+            by="produtividade_media",
+            ascending=False
+        ).reset_index(drop=True)
+
+        tabela_municipios["ranking"] = tabela_municipios.index + 1
+
+        # Municípios abaixo da média são considerados em risco
+        media_produtividade = tabela_municipios["produtividade_media"].mean()
+
+        municipios_risco = tabela_municipios[
+            tabela_municipios["produtividade_media"] < media_produtividade
         ]
 
-    # --- Integrar módulo de análise: aplicar filtros ---
-    df_filtrado = aplicar_filtros(df, cultura, de, ate, municipios_int)
+        tabela_gestor = []
 
-    if df_filtrado.empty:
-        raise HTTPException(
-            status_code=404,
-            detail="Nenhum dado encontrado para os filtros informados."
-        )
-
-
-    # --- Integrar módulo de análise: solicitar figura --- #
-    figura = solicitar_figura(df_filtrado, cultura, de, ate)
-
-    # --- Integrar módulo de análise: solicitar KPIs --- #
-    kpis = solicitar_kpis(df_filtrado)
-
-
-# Tendência da produtividade
-
-    produtividade_por_ano = (
-        df_filtrado
-        .groupby("ano")["rendimento_medio_kg_ha"]
-        .mean()
-        .sort_index()
-   )
-
-    if len(produtividade_por_ano) >= 2:
-       primeira = produtividade_por_ano.iloc[0]
-       ultima = produtividade_por_ano.iloc[-1]
-
-       if ultima > primeira:
-           tendencia = "crescente"
-       elif ultima < primeira:
-            tendencia = "decrescente"
-       else:
-            tendencia = "estável"
-    else:
-        tendencia = "estável"
-
-
-    kpis = {
-        "produtividade_media": f"{produtividade_media:.0f} kg/ha",
-        "chuva_total": f"{chuva_total:.0f} mm",
-        "tendencia": tendencia,
-    }
-
-
-    # PRODUTOR
-
-
-    if perfil == "PRODUTOR":
-        return {
-            "figura": figura,
-            "kpis": kpis,
-       }
-
-
-    # TABELA POR MUNICÍPIO
-
-    tabela_municipios = (
-        df_filtrado
-        .groupby(["municipio_codigo", "nome"], dropna=False)
-        .agg(
-            produtividade_media=("rendimento_medio_kg_ha", "mean"),
-            chuva_total=("precipitacao_total_mm_T1", "sum"),
-        )
-        .reset_index()
-    )
-
-
-
-# TECNICO
-
-    if perfil == "TECNICO":
-        tabela = []
         for _, linha in tabela_municipios.iterrows():
-            tabela.append({
+            tabela_gestor.append({
                 "municipio": linha["nome"],
                 "codigo": str(int(linha["municipio_codigo"])),
                 "produtividade_media": f"{linha['produtividade_media']:.0f} kg/ha",
-                "chuva_total": f"{linha['chuva_total']:.0f} mm",
+                "ranking": int(linha["ranking"]),
             })
 
-        kpis["tabela"] = tabela
+        kpis["total_municipios"] = int(
+            tabela_municipios["municipio_codigo"].nunique()
+        )
+
+        kpis["municipios_risco"] = (
+            municipios_risco["nome"].dropna().tolist()
+        )
+
+        kpis["tabela"] = tabela_gestor
 
         return {
             "figura": figura,
             "kpis": kpis
         }
 
+    except HTTPException:
+        raise
 
-# GESTOR 
-
-
-    # Ranking dos municípios por produtividade
-    tabela_municipios = tabela_municipios.sort_values(
-        by="produtividade_media", ascending=False
-    ).reset_index(drop=True)
-
-    tabela_municipios["ranking"] = tabela_municipios.index + 1
-
-    # Municípios abaixo da média são considerados em risco
-    media_produtividade = tabela_municipios["produtividade_media"].mean()
-    municipios_risco = tabela_municipios[
-        tabela_municipios["produtividade_media"] < media_produtividade
-    ]
-
-    tabela_gestor = []
-    for _, linha in tabela_municipios.iterrows():
-        tabela_gestor.append({
-            "municipio": linha["nome"],
-            "codigo": str(int(linha["municipio_codigo"])),
-            "produtividade_media": f"{linha['produtividade_media']:.0f} kg/ha",
-            "ranking": int(linha["ranking"]),
-        })
-
-    kpis["total_municipios"] = int(tabela_municipios["municipio_codigo"].nunique())
-    kpis["municipios_risco"] = municipios_risco["nome"].dropna().tolist()
-    kpis["tabela"] = tabela_gestor
-
-    return {"figura": figura, "kpis": kpis}
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Erro interno ao processar a solicitação."
+        )
