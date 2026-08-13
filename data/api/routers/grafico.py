@@ -75,11 +75,131 @@ def obter_grafico(
             detail="Nenhum dado encontrado para os filtros informados."
         )
 
-    # --- Integrar módulo de análise: solicitar figura e KPIs ---
-    figura = solicitar_figura(df_filtrado, cultura, de, ate)
-    kpis = solicitar_kpis(df_filtrado)
 
-    return {
-        "figura": figura,
-        "kpis": kpis
+    # --- Integrar módulo de análise: solicitar figura --- #
+    figura = solicitar_figura(df_filtrado, cultura, de, ate)
+
+    # KPIs básicos
+
+    produtividade_media = df_filtrado["rendimento_medio_kg_ha"].mean()
+
+    colunas_chuva = [
+        "precipitacao_total_mm_T1",
+        "precipitacao_total_mm_T2",
+        "precipitacao_total_mm_T3",
+        "precipitacao_total_mm_T4",
+    ]
+
+    chuva_total = (
+        df_filtrado[colunas_chuva]
+        .sum()
+        .sum()
+    )
+
+
+# Tendência da produtividade
+
+    produtividade_por_ano = (
+        df_filtrado
+        .groupby("ano")["rendimento_medio_kg_ha"]
+        .mean()
+        .sort_index()
+   )
+
+    if len(produtividade_por_ano) >= 2:
+       primeira = produtividade_por_ano.iloc[0]
+       ultima = produtividade_por_ano.iloc[-1]
+
+       if ultima > primeira:
+           tendencia = "crescente"
+       elif ultima < primeira:
+            tendencia = "decrescente"
+       else:
+            tendencia = "estável"
+    else:
+        tendencia = "estável"
+
+
+    kpis = {
+        "produtividade_media": f"{produtividade_media:.0f} kg/ha",
+        "chuva_total": f"{chuva_total:.0f} mm",
+        "tendencia": tendencia,
     }
+
+
+    # PRODUTOR
+
+
+    if perfil == "PRODUTOR":
+        return {
+            "figura": figura,
+            "kpis": kpis,
+       }
+
+
+    # TABELA POR MUNICÍPIO
+
+    tabela_municipios = (
+        df_filtrado
+        .groupby(["municipio_codigo", "nome"], dropna=False)
+        .agg(
+            produtividade_media=("rendimento_medio_kg_ha", "mean"),
+            chuva_total=("precipitacao_total_mm_T1", "sum"),
+        )
+        .reset_index()
+    )
+
+
+
+# TECNICO
+
+    if perfil == "TECNICO":
+        tabela = []
+        for _, linha in tabela_municipios.iterrows():
+            tabela.append({
+                "municipio": linha["nome"],
+                "codigo": str(int(linha["municipio_codigo"])),
+                "produtividade_media": f"{linha['produtividade_media']:.0f} kg/ha",
+                "chuva_total": f"{linha['chuva_total']:.0f} mm",
+            })
+
+        kpis["tabela"] = tabela
+
+        return {
+            "figura": figura,
+            "kpis": kpis
+        }
+
+
+# GESTOR 
+
+
+    # Ranking dos municípios por produtividade
+    tabela_municipios = tabela_municipios.sort_values(
+        by="produtividade_media", ascending=False
+    ).reset_index(drop=True)
+
+    tabela_municipios["ranking"] = tabela_municipios.index + 1
+
+    # Municípios abaixo da média são considerados em risco
+    media_produtividade = tabela_municipios["produtividade_media"].mean()
+    municipios_risco = tabela_municipios[
+        tabela_municipios["produtividade_media"] < media_produtividade
+    ]
+
+    tabela_gestor = []
+    for _, linha in tabela_municipios.iterrows():
+        tabela_gestor.append({
+            "municipio": linha["nome"],
+            "codigo": str(int(linha["municipio_codigo"])),
+            "produtividade_media": f"{linha['produtividade_media']:.0f} kg/ha",
+            "ranking": int(linha["ranking"]),
+        })
+
+    kpis["total_municipios"] = int(tabela_municipios["municipio_codigo"].nunique())
+    kpis["municipios_risco"] = municipios_risco["nome"].dropna().tolist()
+    kpis["tabela"] = tabela_gestor
+
+    return {"figura": figura, "kpis": kpis}
+
+      
