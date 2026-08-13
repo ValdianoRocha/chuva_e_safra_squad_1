@@ -279,22 +279,8 @@ def obter_grafico(
     # --- Integrar módulo de análise: solicitar figura --- #
     figura = solicitar_figura(df_filtrado, cultura, de, ate)
 
-    # KPIs básicos
-
-    produtividade_media = df_filtrado["rendimento_medio_kg_ha"].mean()
-
-    colunas_chuva = [
-        "precipitacao_total_mm_T1",
-        "precipitacao_total_mm_T2",
-        "precipitacao_total_mm_T3",
-        "precipitacao_total_mm_T4",
-    ]
-
-    chuva_total = (
-        df_filtrado[colunas_chuva]
-        .sum()
-        .sum()
-    )
+    # --- Integrar módulo de análise: solicitar KPIs --- #
+    kpis = solicitar_kpis(df_filtrado)
 
 
 # Tendência da produtividade
