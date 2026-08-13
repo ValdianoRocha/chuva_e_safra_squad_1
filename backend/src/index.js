@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const ERROS = require("./config/erros");
+const authRoutes = require("./routes/auth");
 
 const app = express();
 
@@ -17,8 +18,9 @@ app.get("/health", (req, res) => {
   });
 });
 
-
 // ROTAs aqui 
+
+app.use("/auth", authRoutes);
 
 // Rotas temporárias para testar o Error Handler
 
