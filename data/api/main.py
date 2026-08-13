@@ -13,7 +13,7 @@ Docs automáticas (Card 8):
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import grafico
+from api.routers import rotas_graficos
 
 app = FastAPI(
     title="Chuva & Safra API",
@@ -29,7 +29,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(grafico.router)
+app.include_router(rotas_graficos.router)
 
 
 @app.get("/")
