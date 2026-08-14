@@ -213,7 +213,17 @@ MUNICIPIOS = {
 MunicipioEnum = Enum(
     "MunicipioEnum",
     {
-        nome.upper().replace(" ", "_").replace("-", "_"): nome
+        nome.upper()
+        .replace(" ", "_")
+        .replace("-", "_")
+        .replace("Á", "A")
+        .replace("É", "E")
+        .replace("Í", "I")
+        .replace("Ó", "O")
+        .replace("Ú", "U")
+        .replace("Ã", "A")
+        .replace("Õ", "O")
+        .replace("Ç", "C"): nome
         for nome in MUNICIPIOS
     },
     type=str,
@@ -229,7 +239,7 @@ router = APIRouter()
     summary="Consultar gráficos e KPIs",
     description="""
     Retorna os dados dos gráficos e os KPIs calculados
-    de acordo com o perfil, cultura, período e municípios informados.
+    de acordo com o perfil, cultura, período e município informado.
 
     Perfis disponíveis:
     - PRODUTOR: retorna KPIs gerais da produção.
@@ -272,9 +282,9 @@ def obter_grafico(
         le=2022,
         description="Ano final do período de análise."
     ),
-    municipios: list[MunicipioEnum] | None = Query(
+    municipio: MunicipioEnum | None = Query(
         None,
-        description="Lista de municípios utilizados no filtro. Obrigatório para PRODUTOR e TECNICO."
+        description="Município utilizado no filtro. Obrigatório para PRODUTOR e TECNICO."
     ),
 ):
     # PERFIS VÁLIDOS
@@ -318,11 +328,11 @@ def obter_grafico(
             detail="O ano inicial não pode ser maior que o ano final."
         )
 
-    # VALIDA MUNICÍPIOS
-    if perfil != "GESTOR" and not municipios:
+    # VALIDA MUNICÍPIO
+    if perfil != "GESTOR" and not municipio:
         raise HTTPException(
             status_code=400,
-            detail="Informe pelo menos um município."
+            detail="Informe um município."
         )
 
     try:
@@ -332,10 +342,9 @@ def obter_grafico(
         # --- Converter nome do município para código IBGE ---
         municipios_int = None
 
-        if municipios:
+        if municipio:
             municipios_int = [
-                MUNICIPIOS[m.value]
-                for m in municipios
+                MUNICIPIOS[municipio.value]
             ]
 
         # --- Integrar módulo de análise: aplicar filtros ---
@@ -379,7 +388,9 @@ def obter_grafico(
         raise
 
     # --- Tratar erros inesperados ---
-    except Exception:
+    except Exception as erro:
+        print(f"ERRO: {erro}")
+
         raise HTTPException(
             status_code=500,
             detail="Erro interno ao processar a solicitação."

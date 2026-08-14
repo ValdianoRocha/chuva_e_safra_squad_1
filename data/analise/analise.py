@@ -53,23 +53,47 @@ import pandas as pd
 from get_db.get_db import get_db
 
 
-
 # CARREGAR BASE DE DADOS
-
 
 df = get_db()
 
 
+# PREPARAR BASE PARA ANÁLISE
 
-# GERA A COLUNA DE PRODUTIVIDADE
+def preparar_base(df):
+    # Cria uma cópia da base para não alterar o DataFrame original
+    df = df.copy()
+
+    # GERA A COLUNA DE PRODUTIVIDADE
+
+    df["produtividade_ton_ha"] = np.where(
+        (df["area_colhida_ha"] > 0)
+        & (df["quantidade_produzida_ton"].notna()),
+        df["quantidade_produzida_ton"] / df["area_colhida_ha"],
+        np.nan,
+    )
+
+    # CALCULA A PRECIPITAÇÃO TOTAL DO ANO CIVIL
+
+    # Usamos o ano civil porque ele captura o ciclo agrícola completo
+    # e vai considerar chuvas atipicas que estão fora da quadra
+
+    df["precipitacao_total_mm_ano_civil"] = (
+        df["precipitacao_total_mm_T1"]
+        + df["precipitacao_total_mm_T2"]
+        + df["precipitacao_total_mm_T3"]
+        + df["precipitacao_total_mm_T4"]
+    )
+
+    return df
 
 
-df["produtividade_ton_ha"] = np.where(
-    (df["area_colhida_ha"] > 0)
-    & (df["quantidade_produzida_ton"].notna()),
-    df["quantidade_produzida_ton"] / df["area_colhida_ha"],
-    np.nan,
-)
+# PREPARAR BASE ORIGINAL
+
+df = preparar_base(df)
+
+
+# IDENTIFICA REGISTROS SEM PRODUTIVIDADE
 
 invalidos = df["produtividade_ton_ha"].isna().sum()
 
@@ -79,23 +103,7 @@ print(
 )
 
 
-
-# CALCULA A PRECIPITAÇÃO TOTAL DO ANO CIVIL
-
-# Usamos o ano civil porque ele captura o ciclo agrícola completo
-# e vai considerar chuvas atipicas que estão fora da quadra
-
-df["precipitacao_total_mm_ano_civil"] = (
-    df["precipitacao_total_mm_T1"]
-    + df["precipitacao_total_mm_T2"]
-    + df["precipitacao_total_mm_T3"]
-    + df["precipitacao_total_mm_T4"]
-)
-
-
-
 # ESTATÍSTICAS DESCRITIVAS
-
 
 colunas_interesse = [
     # Produção e Área
@@ -120,9 +128,7 @@ print("\n--- Estatísticas Descritivas ---")
 print(tabela_estatisticas)
 
 
-
 # CORRELAÇÃO ENTRE CHUVA E PRODUTIVIDADE
-
 
 colunas_chuva = [
     "precipitacao_total_mm_T1",
@@ -206,9 +212,7 @@ for col in colunas_chuva:
     )
 
 
-
 # IDENTIFICA COMPORTAMENTOS ATÍPICOS
-
 
 media_chuva = df[
     "precipitacao_total_mm_ano_civil"
@@ -246,9 +250,7 @@ df["comportamento_atipico"] = np.select(
 )
 
 
-
 # TABELA DE MUNICÍPIOS ATÍPICOS
-
 
 colunas_entregavel = [
     "municipio_codigo",
@@ -282,9 +284,7 @@ print("\n--- Tabela de Municípios Atípicos ---")
 print(tabela_municipios_atipicos)
 
 
-
 # PRODUTIVIDADE E CHUVA POR ANO
-
 
 df_por_ano = (
     df.groupby("ano")
@@ -314,9 +314,7 @@ df_por_ano = (
 )
 
 
-
 # PRODUTIVIDADE E CHUVA POR MUNICÍPIO
-
 
 coluna_nome = (
     "nome"
@@ -350,9 +348,7 @@ df_por_municipio = (
 )
 
 
-
 # TABELA PARA GRÁFICO DE DISPERSÃO
-
 
 df_dispersao = df[
     [
@@ -372,9 +368,7 @@ df_dispersao = df[
 )
 
 
-
 # TABELA PARA RANKINGS
-
 
 df_ranking_produtividade = (
     df_por_municipio
@@ -396,9 +390,7 @@ df_ranking_precipitacao = (
 )
 
 
-
 # DADOS UTILIZADOS PELOS GRÁFICOS
-
 
 graficos = {
     "evolucao_anual": df_por_ano,
@@ -423,7 +415,8 @@ def aplicar_filtros(
     sobre a base de dados.
     """
 
-    df_filtrado = df.copy()
+    # PREPARAR BASE PARA ANÁLISE
+    df_filtrado = preparar_base(df)
 
     # Filtro por cultura
     if "cultura" in df_filtrado.columns:
@@ -456,7 +449,6 @@ def aplicar_filtros(
 
 # SOLICITAR FIGURA
 
-
 def solicitar_figura(
     df_filtrado,
     cultura,
@@ -467,6 +459,9 @@ def solicitar_figura(
     Retorna os dados necessários para a construção
     dos gráficos.
     """
+
+    # PREPARAR BASE PARA ANÁLISE
+    df_filtrado = preparar_base(df_filtrado)
 
     dados = {
         "evolucao_anual": (
@@ -505,7 +500,6 @@ def solicitar_figura(
 
 # SOLICITAR KPIs
 
-
 def solicitar_kpis(
     df_filtrado,
     perfil
@@ -514,6 +508,9 @@ def solicitar_kpis(
     Calcula e retorna os KPIs de acordo com o perfil
     solicitado.
     """
+
+    # PREPARAR BASE PARA ANÁLISE
+    df_filtrado = preparar_base(df_filtrado)
 
     kpis = {}
 
