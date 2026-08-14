@@ -4,6 +4,7 @@ require("dotenv").config();
 const ERROS = require("./config/erros");
 const authRoutes = require("./routes/auth");
 const { autenticar, exigirPerfil } = require("./middlewares/authenticate");
+const graficoRoutes = require('./routes/grafico');
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.get("/health", (req, res) => {
 // ROTAs aqui 
 
 app.use("/auth", authRoutes);
+app.use('/api', graficoRoutes);
 
 // Rotas temporárias para testar o Error Handler
 
