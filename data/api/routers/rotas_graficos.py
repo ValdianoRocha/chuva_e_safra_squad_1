@@ -4,19 +4,23 @@ from analise.analise import aplicar_filtros, solicitar_figura, solicitar_kpis
 from enum import Enum
 
 
+# PERFIS DISPONÍVEIS
 class PerfilEnum(str, Enum):
     PRODUTOR = "PRODUTOR"
     TECNICO = "TECNICO"
     GESTOR = "GESTOR"
 
 
+# CULTURAS DISPONÍVEIS
 class CulturaEnum(str, Enum):
     milho = "milho"
     feijao = "feijao"
     mandioca = "mandioca"
     caju = "caju"
     banana = "banana"
-    
+
+
+# MUNICÍPIOS E CÓDIGOS IBGE
 MUNICIPIOS = {
     "Abaiara": 2300101,
     "Acarape": 2300150,
@@ -204,50 +208,117 @@ MUNICIPIOS = {
     "Viçosa do Ceará": 2314102,
 }
 
+
+# ENUM DOS MUNICÍPIOS
 MunicipioEnum = Enum(
     "MunicipioEnum",
-    {nome.upper().replace(" ", "_").replace("-", "_"): nome for nome in MUNICIPIOS},
+    {
+        nome.upper().replace(" ", "_").replace("-", "_"): nome
+        for nome in MUNICIPIOS
+    },
     type=str,
 )
-
 
 
 router = APIRouter()
 
 
+# ENDPOINT DE GRÁFICOS E KPIs
+@router.get(
+    "/grafico",
+    summary="Consultar gráficos e KPIs",
+    description="""
+    Retorna os dados dos gráficos e os KPIs calculados
+    de acordo com o perfil, cultura, período e municípios informados.
 
-@router.get("/grafico")
+    Perfis disponíveis:
+    - PRODUTOR: retorna KPIs gerais da produção.
+    - TECNICO: retorna KPIs e informações por município.
+    - GESTOR: retorna KPIs, ranking e municípios em situação de risco.
+    """,
+    responses={
+        200: {
+            "description": "Dados dos gráficos e KPIs retornados com sucesso."
+        },
+        400: {
+            "description": "Parâmetros inválidos."
+        },
+        404: {
+            "description": "Nenhum dado encontrado para os filtros informados."
+        },
+        500: {
+            "description": "Erro interno ao processar a solicitação."
+        },
+    },
+)
 def obter_grafico(
-    perfil: PerfilEnum = Query(...),
-    cultura: CulturaEnum = Query(...),
-    de: int = Query(..., ge=2015, le=2022),
-    ate: int = Query(..., ge=2015, le=2022),
-    municipios: list[MunicipioEnum] | None = Query(None),
+    perfil: PerfilEnum = Query(
+        ...,
+        description="Perfil do usuário: PRODUTOR, TECNICO ou GESTOR."
+    ),
+    cultura: CulturaEnum = Query(
+        ...,
+        description="Cultura agrícola utilizada no filtro."
+    ),
+    de: int = Query(
+        ...,
+        ge=2015,
+        le=2022,
+        description="Ano inicial do período de análise."
+    ),
+    ate: int = Query(
+        ...,
+        ge=2015,
+        le=2022,
+        description="Ano final do período de análise."
+    ),
+    municipios: list[MunicipioEnum] | None = Query(
+        None,
+        description="Lista de municípios utilizados no filtro. Obrigatório para PRODUTOR e TECNICO."
+    ),
 ):
-    perfis_validos = {"PRODUTOR", "TECNICO", "GESTOR"}
-    culturas_validas = {"milho", "feijao", "mandioca", "caju", "banana"}
+    # PERFIS VÁLIDOS
+    perfis_validos = {
+        "PRODUTOR",
+        "TECNICO",
+        "GESTOR"
+    }
 
+    # CULTURAS VÁLIDAS
+    culturas_validas = {
+        "milho",
+        "feijao",
+        "mandioca",
+        "caju",
+        "banana"
+    }
+
+    # CONVERTE ENUM PARA VALOR
     perfil = perfil.value
     cultura = cultura.value
 
+    # VALIDA PERFIL
     if perfil not in perfis_validos:
         raise HTTPException(
             status_code=400,
             detail="Perfil inválido. Use PRODUTOR, TECNICO ou GESTOR."
         )
 
+    # VALIDA CULTURA
     if cultura not in culturas_validas:
         raise HTTPException(
             status_code=400,
             detail="Cultura inválida."
         )
 
+    # VALIDA PERÍODO
     if de > ate:
         raise HTTPException(
             status_code=400,
             detail="O ano inicial não pode ser maior que o ano final."
         )
 
+    # VALIDA MUNICÍPIOS
     if perfil != "GESTOR" and not municipios:
         raise HTTPException(
             status_code=400,
@@ -257,7 +328,7 @@ def obter_grafico(
     try:
         # --- Buscar dados (módulo get_db) ---
         df = get_db()
-        
+
         # --- Converter nome do município para código IBGE ---
         municipios_int = None
 
@@ -276,13 +347,14 @@ def obter_grafico(
             municipios_int
         )
 
+        # --- Verificar se existem dados ---
         if df_filtrado.empty:
             raise HTTPException(
                 status_code=404,
                 detail="Nenhum dado encontrado para os filtros informados."
             )
 
-        # --- Integrar módulo de análise: solicitar figura --- #
+        # --- Integrar módulo de análise: solicitar figura ---
         figura = solicitar_figura(
             df_filtrado,
             cultura,
@@ -290,94 +362,23 @@ def obter_grafico(
             ate
         )
 
-        # --- Integrar módulo de análise: solicitar KPIs --- #
-        kpis = {}
-
-        # PRODUTOR
-
-        if perfil == "PRODUTOR":
-            return {
-                "figura": figura,
-                "kpis": kpis,
-            }
-
-        # TABELA POR MUNICÍPIO
-
-        tabela_municipios = (
-            df_filtrado
-            .groupby(["municipio_codigo", "nome"], dropna=False)
-            .agg(
-                produtividade_media=("rendimento_medio_kg_ha", "mean"),
-                chuva_total=("precipitacao_total_mm_T1", "sum"),
-            )
-            .reset_index()
+        # --- Integrar módulo de análise: solicitar KPIs ---
+        kpis = solicitar_kpis(
+            df_filtrado,
+            perfil
         )
 
-        # TECNICO
-
-        if perfil == "TECNICO":
-            tabela = []
-
-            for _, linha in tabela_municipios.iterrows():
-                tabela.append({
-                    "municipio": linha["nome"],
-                    "codigo": str(int(linha["municipio_codigo"])),
-                    "produtividade_media": f"{linha['produtividade_media']:.0f} kg/ha",
-                    "chuva_total": f"{linha['chuva_total']:.0f} mm",
-                })
-
-            kpis["tabela"] = tabela
-
-            return {
-                "figura": figura,
-                "kpis": kpis
-            }
-
-        # GESTOR
-
-        # Ranking dos municípios por produtividade
-        tabela_municipios = tabela_municipios.sort_values(
-            by="produtividade_media",
-            ascending=False
-        ).reset_index(drop=True)
-
-        tabela_municipios["ranking"] = tabela_municipios.index + 1
-
-        # Municípios abaixo da média são considerados em risco
-        media_produtividade = tabela_municipios["produtividade_media"].mean()
-
-        municipios_risco = tabela_municipios[
-            tabela_municipios["produtividade_media"] < media_produtividade
-        ]
-
-        tabela_gestor = []
-
-        for _, linha in tabela_municipios.iterrows():
-            tabela_gestor.append({
-                "municipio": linha["nome"],
-                "codigo": str(int(linha["municipio_codigo"])),
-                "produtividade_media": f"{linha['produtividade_media']:.0f} kg/ha",
-                "ranking": int(linha["ranking"]),
-            })
-
-        kpis["total_municipios"] = int(
-            tabela_municipios["municipio_codigo"].nunique()
-        )
-
-        kpis["municipios_risco"] = (
-            municipios_risco["nome"].dropna().tolist()
-        )
-
-        kpis["tabela"] = tabela_gestor
-
+        # --- Retornar figura e KPIs ---
         return {
             "figura": figura,
             "kpis": kpis
         }
 
+    # --- Repassar erros HTTP ---
     except HTTPException:
         raise
 
+    # --- Tratar erros inesperados ---
     except Exception:
         raise HTTPException(
             status_code=500,
