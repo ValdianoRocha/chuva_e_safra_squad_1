@@ -3,6 +3,7 @@ const cors = require("cors");
 require("dotenv").config();
 const ERROS = require("./config/erros");
 const authRoutes = require("./routes/auth");
+const { autenticar, exigirPerfil } = require("./middlewares/authenticate");
 
 const app = express();
 
@@ -23,6 +24,25 @@ app.get("/health", (req, res) => {
 app.use("/auth", authRoutes);
 
 // Rotas temporárias para testar o Error Handler
+
+app.get("/teste-auth", autenticar, (req, res) => {
+  res.json({
+    mensagem: "Autenticado!",
+    usuario: req.usuario,
+  });
+});
+
+app.get(
+  "/teste-gestor",
+  autenticar,
+  exigirPerfil("GESTOR"),
+  (req, res) => {
+    res.json({
+      mensagem: "Acesso de Gestor confirmado!",
+    });
+  }
+);
+
 
 app.get("/teste/erro-mapeado", (req, res, next) => {
   try {
