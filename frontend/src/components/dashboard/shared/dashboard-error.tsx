@@ -1,12 +1,14 @@
-import { AlertCircleIcon } from "lucide-react"
+import { AlertCircleIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 
 type DashboardErrorProps = {
-  onRetry?: () => void
-}
+  message?: string;
+  onRetry?: () => void;
+};
 
 export function DashboardError({
+  message = "O serviço de dados pode estar temporariamente indisponível. Tente novamente em alguns instantes.",
   onRetry,
 }: DashboardErrorProps) {
   return (
@@ -19,20 +21,13 @@ export function DashboardError({
         Não foi possível carregar os dados
       </h2>
 
-      <p className="mt-2 max-w-md text-sm text-muted-foreground">
-        O serviço de dados pode estar temporariamente indisponível.
-        Tente novamente em alguns instantes.
-      </p>
+      <p className="mt-2 max-w-md text-sm text-muted-foreground">{message}</p>
 
       {onRetry && (
-        <Button
-          className="mt-4"
-          variant="outline"
-          onClick={onRetry}
-        >
+        <Button className="mt-4" variant="outline" onClick={onRetry}>
           Tentar novamente
         </Button>
       )}
     </div>
-  )
+  );
 }

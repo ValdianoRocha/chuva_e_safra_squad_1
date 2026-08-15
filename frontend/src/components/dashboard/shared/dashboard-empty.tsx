@@ -2,7 +2,7 @@ import { CloudOffIcon } from "lucide-react"
 
 export function DashboardEmpty() {
   return (
-    <div className="mx-4 flex min-h-[350px] flex-col items-center justify-center rounded-xl border border-dashed text-center lg:mx-6">
+    <div className="mx-4 flex min-h-87.5 flex-col items-center justify-center rounded-xl border border-dashed text-center lg:mx-6">
       <div className="flex size-12 items-center justify-center rounded-full bg-muted">
         <CloudOffIcon className="size-6 text-muted-foreground" />
       </div>

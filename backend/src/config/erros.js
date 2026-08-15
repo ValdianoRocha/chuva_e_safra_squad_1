@@ -19,14 +19,19 @@
  */
 
 const ERROS = Object.freeze({
-  // Validação
+  // ==============================
+  // VALIDAÇÃO
+  // ==============================
+
   CAMPOS_OBRIGATORIOS: {
     status: 400,
     mensagem: "Campos obrigatórios faltando.",
   },
 
+  // ==============================
+  // AUTENTICAÇÃO
+  // ==============================
 
-  // Autenticação
   EMAIL_DUPLICADO: {
     status: 409,
     mensagem: "Este e-mail já está cadastrado.",
@@ -37,7 +42,10 @@ const ERROS = Object.freeze({
     mensagem: "E-mail ou senha incorretos.",
   },
 
-  // JWT
+  // ==============================
+  // JWT / AUTORIZAÇÃO
+  // ==============================
+
   TOKEN_AUSENTE: {
     status: 401,
     mensagem: "Autenticação necessária.",
@@ -59,7 +67,19 @@ const ERROS = Object.freeze({
     mensagem: "Seu perfil não tem acesso a este recurso.",
   },
 
-  // Integração com FastAPI
+  // ==============================
+  // TÉCNICOS
+  // ==============================
+
+  TECNICO_NAO_ENCONTRADO: {
+    status: 404,
+    mensagem: "Técnico não encontrado.",
+  },
+
+  // ==============================
+  // FASTAPI
+  // ==============================
+
   FASTAPI_INDISPONIVEL: {
     status: 503,
     mensagem: "Serviço de dados indisponível. Tente novamente.",
