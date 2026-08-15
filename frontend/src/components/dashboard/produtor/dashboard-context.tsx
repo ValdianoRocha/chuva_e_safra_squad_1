@@ -1,22 +1,22 @@
-"use client"
+"use client";
 
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@/components/ui/badge";
 
 type DashboardContextProps = {
-  cultura: string
-  municipio?: string
-  anoInicial: string
-  anoFinal: string
-}
+  cultura: string;
+  municipio: string;
+  anoInicial: string;
+  anoFinal: string;
+};
 
 export function DashboardContext({
   cultura,
-  municipio = "Amontada",
+  municipio,
   anoInicial,
   anoFinal,
 }: DashboardContextProps) {
   const culturaFormatada =
-    cultura.charAt(0).toUpperCase() + cultura.slice(1)
+    cultura.charAt(0).toUpperCase() + cultura.slice(1);
 
   return (
     <div className="px-4 lg:px-6">
@@ -34,5 +34,5 @@ export function DashboardContext({
         </Badge>
       </div>
     </div>
-  )
+  );
 }

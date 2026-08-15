@@ -5,6 +5,7 @@ const ERROS = require("./config/erros");
 const authRoutes = require("./routes/auth");
 const { autenticar, exigirPerfil } = require("./middlewares/authenticate");
 const graficoRoutes = require('./routes/grafico');
+const tecnicoRoutes = require("./routes/tecnicos");
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.get("/health", (req, res) => {
 
 app.use("/auth", authRoutes);
 app.use('/api', graficoRoutes);
+app.use("/api", tecnicoRoutes);
 
 // Rotas temporárias para testar o Error Handler
 

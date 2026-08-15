@@ -15,122 +15,285 @@
 // perfil e municipios vêm do TOKEN JWT (passados pelo controller)
 // Esses valores NUNCA vêm do frontend diretamente
 
-const axios = require('axios');
-const mockPorPerfil = require('../mocks/graficoMock');
+const axios = require("axios");
+const mockPorPerfil = require("../mocks/graficoMock");
 
 // ─────────────────────────────────────────────────────────────
 // montarParams
-//
-// Monta os parâmetros que serão enviados ao FastAPI.
-// A lógica de perfil vive AQUI — não no controller.
-//
-// Parâmetros:
-//   perfil     — string: PRODUTOR | TECNICO | GESTOR (DO TOKEN)
-//   municipios — string[]: códigos IBGE (DO TOKEN)
-//   cultura    — string: milho | feijao | etc (do req.query)
-//   de         — string: ano inicial (do req.query)
-//   ate        — string: ano final (do req.query)
-//
-// Retorna:
-//   URLSearchParams pronto para uso na URL do FastAPI
 // ─────────────────────────────────────────────────────────────
+
 function montarParams({ perfil, municipios, cultura, de, ate }) {
   const params = new URLSearchParams({
     perfil,
-    cultura: cultura || 'milho',
-    de: de || '2015',
-    ate: ate || '2022',
+    cultura: cultura || "milho",
+    de: de || "2015",
+    ate: ate || "2022",
   });
 
-  // REGRA DE AUTORIZAÇÃO:
-  // PRODUTOR e TECNICO → filtrar pelos municípios do token
-  // GESTOR → sem filtro → FastAPI retorna dados do estado inteiro
+  // PRODUTOR e TECNICO:
+  // envia somente os municípios permitidos pelo token.
   //
-  // Por que não enviar municipios para o GESTOR?
-  // O array do GESTOR é [] (vazio) — cadastrado assim no banco.
-  // Se enviássemos [], o FastAPI receberia uma lista vazia
-  // e poderia interpretar como "nenhum município" em vez de "todos".
-  // Omitir o parâmetro é a forma mais clara de dizer "sem filtro".
-  if (perfil !== 'GESTOR' && municipios && municipios.length > 0) {
-    municipios.forEach(cod => params.append('municipios', cod));
+  // GESTOR:
+  // não envia municipios, pois representa o estado inteiro.
+  if (perfil !== "GESTOR" && municipios && municipios.length > 0) {
+    municipios.forEach((codigo) => {
+      params.append("municipios", codigo);
+    });
   }
 
   return params;
 }
 
 // ─────────────────────────────────────────────────────────────
-// buscar
+// filtrarSeriePorPeriodo
 //
-// Busca os dados do gráfico no FastAPI (ou no mock).
+// Filtra somente séries cujo eixo X representa anos.
 //
-// Parâmetros:
-//   { perfil, municipios, cultura, de, ate }
-//   perfil e municipios vêm do token JWT (via controller)
-//   cultura, de, ate vêm do req.query (filtros do frontend)
+// Exemplo:
+// x: [2015, 2016, 2017, 2018]
+// y: [100, 200, 300, 400]
 //
-// Retorna:
-//   { figura: { data, layout }, kpis: { ... } }
-//
-// Lança:
-//   'FASTAPI_INDISPONIVEL' — FastAPI offline ou recusou conexão
-//   'FASTAPI_TIMEOUT'      — FastAPI não respondeu no tempo limite
+// Se período = 2016–2017:
+// x: [2016, 2017]
+// y: [200, 300]
 // ─────────────────────────────────────────────────────────────
-async function buscar({ perfil, municipios, cultura, de, ate }) {
 
-  // MODO MOCK — retorna dados locais sem chamar o FastAPI
-  // Ativar com USE_MOCK=true no .env durante o desenvolvimento
-  if (process.env.USE_MOCK === 'true') {
-    console.log(`[GraficoService] Modo mock ativo — perfil: ${perfil}`);
+function filtrarSeriePorPeriodo(serie, anoInicial, anoFinal) {
+  const x = Array.isArray(serie.x) ? serie.x : [];
 
-    // Simular delay para testar o loading no frontend
-    await new Promise(resolve => setTimeout(resolve, 500));
+  const y = Array.isArray(serie.y) ? serie.y : [];
 
-    const dadosMock = mockPorPerfil[perfil];
-
-    if (!dadosMock) {
-      throw new Error('PERFIL_INVALIDO');
-    }
-
-    return dadosMock;
+  if (x.length === 0) {
+    return serie;
   }
 
-  // MODO REAL — chama o FastAPI
-  const params = montarParams({ perfil, municipios, cultura, de, ate });
+  // Descobre se o eixo X realmente parece ser uma série de anos.
+  //
+  // Isso evita quebrar o gráfico do TECNICO, cujo eixo X pode ser:
+  // chuva acumulada = [650, 820, 480...]
+  //
+  // Esses valores NÃO são anos.
+  const eixoRepresentaAnos = x.every((valor) => {
+    const numero = Number(valor);
+
+    return !Number.isNaN(numero) && numero >= 1900 && numero <= 2100;
+  });
+
+  if (!eixoRepresentaAnos) {
+    return serie;
+  }
+
+  const pontos = x
+    .map((valorX, index) => ({
+      x: valorX,
+      y: y[index],
+    }))
+    .filter((ponto) => {
+      const ano = Number(ponto.x);
+
+      return ano >= anoInicial && ano <= anoFinal;
+    });
+
+  return {
+    ...serie,
+
+    x: pontos.map((ponto) => ponto.x),
+
+    y: pontos.map((ponto) => ponto.y),
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// montarMock
+//
+// Simula a resposta que futuramente virá do FastAPI.
+//
+// Estrutura esperada do mock:
+//
+// mockPorPerfil = {
+//   PRODUTOR: {
+//     milho: {...},
+//     feijao: {...},
+//     mandioca: {...},
+//     caju: {...},
+//     banana: {...},
+//   },
+//   TECNICO: {
+//     milho: {...},
+//   },
+//   GESTOR: {
+//     milho: {...},
+//   },
+// }
+// ─────────────────────────────────────────────────────────────
+
+function montarMock({ perfil, cultura, de, ate }) {
+  const culturaSelecionada = cultura || "milho";
+
+  // Primeiro verifica se o perfil existe.
+  const dadosPerfil = mockPorPerfil[perfil];
+
+  if (!dadosPerfil) {
+    throw new Error("PERFIL_INVALIDO");
+  }
+
+  // Depois procura a cultura dentro daquele perfil.
+  const dadosOriginais = dadosPerfil[culturaSelecionada];
+
+  if (!dadosOriginais) {
+    throw new Error("CULTURA_INVALIDA");
+  }
+
+  const anoInicial = Number(de || 2015);
+
+  const anoFinal = Number(ate || 2022);
+
+  // Validação básica do período.
+  if (
+    Number.isNaN(anoInicial) ||
+    Number.isNaN(anoFinal) ||
+    anoInicial > anoFinal
+  ) {
+    throw new Error("PERIODO_INVALIDO");
+  }
+
+  // ───────────────────────────────────────────────────────────
+  // Figura
+  // ───────────────────────────────────────────────────────────
+
+  const figura = {
+    ...dadosOriginais.figura,
+
+    data: dadosOriginais.figura.data.map((serie) =>
+      filtrarSeriePorPeriodo(serie, anoInicial, anoFinal),
+    ),
+
+    layout: {
+      ...dadosOriginais.figura.layout,
+
+      title:
+        perfil === "PRODUTOR"
+          ? `${
+              culturaSelecionada.charAt(0).toUpperCase() +
+              culturaSelecionada.slice(1)
+            } — ${anoInicial}–${anoFinal}`
+          : dadosOriginais.figura.layout.title,
+    },
+  };
+
+  // ───────────────────────────────────────────────────────────
+  // KPIs
+  //
+  // Continuam prontos no mock.
+  //
+  // Quando o FastAPI estiver disponível, esses cálculos serão
+  // responsabilidade da API de Dados.
+  // ───────────────────────────────────────────────────────────
+
+  const kpis = {
+    ...dadosOriginais.kpis,
+  };
+
+  return {
+    figura,
+    kpis,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// buscar
+//
+// Busca os dados no mock ou no FastAPI.
+// ─────────────────────────────────────────────────────────────
+
+async function buscar({ perfil, municipios, cultura, de, ate }) {
+  // ==========================================================
+  // MODO MOCK
+  // ==========================================================
+
+  if (process.env.USE_MOCK === "true") {
+    console.log(
+      `[GraficoService] Modo mock ativo — perfil: ${perfil}, cultura: ${
+        cultura || "milho"
+      }, período: ${de || "2015"}-${ate || "2022"}`,
+    );
+
+    // Delay proposital para testar loading no frontend.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 500);
+    });
+
+    return montarMock({
+      perfil,
+      cultura,
+      de,
+      ate,
+    });
+  }
+
+  // ==========================================================
+  // MODO REAL — FASTAPI
+  // ==========================================================
+
+  const params = montarParams({
+    perfil,
+    municipios,
+    cultura,
+    de,
+    ate,
+  });
+
   const url = `${process.env.FASTAPI_URL}/grafico?${params.toString()}`;
-  const timeout = parseInt(process.env.FASTAPI_TIMEOUT_MS) || 10000;
+
+  const timeout = parseInt(process.env.FASTAPI_TIMEOUT_MS, 10) || 10000;
 
   console.log(`[GraficoService] Chamando FastAPI: ${url}`);
 
   try {
-    const resposta = await axios.get(url, { timeout });
+    const resposta = await axios.get(url, {
+      timeout,
+    });
+
     return resposta.data;
-
   } catch (erro) {
+    // ─────────────────────────────────────────────────────────
+    // TIMEOUT
+    // ─────────────────────────────────────────────────────────
 
-    // Timeout — FastAPI não respondeu no tempo limite
-    if (erro.code === 'ECONNABORTED') {
+    if (erro.code === "ECONNABORTED") {
       console.error(`[GraficoService] Timeout após ${timeout}ms`);
-      throw new Error('FASTAPI_TIMEOUT');
+
+      throw new Error("FASTAPI_TIMEOUT");
     }
 
-    // Conexão recusada ou FastAPI offline
+    // ─────────────────────────────────────────────────────────
+    // FASTAPI OFFLINE
+    // ─────────────────────────────────────────────────────────
+
     if (
-      erro.code === 'ECONNREFUSED' ||
-      erro.code === 'ENOTFOUND' ||
+      erro.code === "ECONNREFUSED" ||
+      erro.code === "ENOTFOUND" ||
       !erro.response
     ) {
       console.error(`[GraficoService] FastAPI indisponível: ${erro.code}`);
-      throw new Error('FASTAPI_INDISPONIVEL');
+
+      throw new Error("FASTAPI_INDISPONIVEL");
     }
 
-    // FastAPI respondeu com erro HTTP (4xx, 5xx)
-    // Repassar o erro com detalhes para o controller logar
+    // ─────────────────────────────────────────────────────────
+    // FASTAPI RESPONDEU COM ERRO HTTP
+    // ─────────────────────────────────────────────────────────
+
     console.error(`[GraficoService] FastAPI retornou ${erro.response.status}`);
 
-    const err = new Error('FASTAPI_INDISPONIVEL');
+    const err = new Error("FASTAPI_INDISPONIVEL");
+
     err.detalhes = erro.response.data;
+
     throw err;
   }
 }
 
-module.exports = { buscar };
+module.exports = {
+  buscar,
+};
